@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    mlops.service: minio
+  name: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      mlops.service: minio
+  template:
+    metadata:
+      labels:
+        mlops.service: minio
+    spec:
+      volumes:
+        - name: minio-pv-storage
+          persistentVolumeClaim:
+            claimName: minio-pvc
+      containers:
+      - name: minio
+        image: minio/minio
+        env:
+          - name: MINIO_ROOT_USER
+            valueFrom:
+              configMapKeyRef:
+                name: mlops-conf
+                key: AWS_ACCESS_KEY_ID
+          - name: MINIO_ROOT_PASSWORD
+            valueFrom:
+              configMapKeyRef:
+                name: mlops-conf
+                key: AWS_SECRET_ACCESS_KEY
+        resources: {}
+          # limits:
+          #   memory: "256Mi"
+          #   cpu: "500m"
+        ports:
+        - containerPort: 9000
+        - containerPort: 9001
+        volumeMounts:
+          - mountPath: /data
+            name: minio-pv-storage
+        args: 
+        - server
+        - /data
+        - --console-address
+        - ":9001"
+      restartPolicy: Always

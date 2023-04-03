@@ -1,0 +1,48 @@
+version: 2.1
+
+jobs:
+  docker-build-and-serve: 
+    machine:
+      image: ubuntu-2204:2022.04.2
+    # docker:
+    #   - image: cimg/base:2021.04
+    resource_class: large
+    steps:
+      - checkout
+      # - setup_remote_docker:
+      #     version: 20.10.14
+      - run:
+          name: Install Docker Compose
+          environment:
+            COMPOSE_VERSION: '1.29.2'
+          command: |
+            curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o ~/docker-compose
+            chmod +x ~/docker-compose
+            sudo mv ~/docker-compose /usr/local/bin/docker-compose
+      - run:
+          name: Build docker images
+          command: docker-compose build 
+            # |
+            # docker build -t spark:3.3 -f ./Docker/Spark/Dockerfile .
+            # docker build -t spark-worker:3.3 -f ./Docker/Spark-worker/Dockerfile .
+            # docker build -t python-runner -f ./Docker/Python-runner/Dockerfile .
+            # docker build -t pyspark-runner -f ./Docker/pySpark-runner/Dockerfile .
+      - run:
+          name: Services up
+          command: docker-compose up -d --no-deps spark-master spark-worker mongo api
+      - run:
+          name: ETL
+          command:  docker-compose run --rm --no-deps etl-runner python url_load.py --fileName=sample.json
+      - run:
+          name: pySpark
+          command:  docker-compose run --rm --no-deps pyspark-runner python spark_trending.py --fileName=sample
+
+          # docker-compose run --rm --no-deps etl-runner python etl.py --fileName=sample.json &&  docker-compose run --rm --no-deps pyspark-runner python spark_trending.py --fileName=sample
+
+
+
+workflows:
+  Step1: # This is the name of the workflow, feel free to change it to better match your workflow.
+    # Inside the workflow, you define the jobs you want to run.
+    jobs:
+      - docker-build-and-serve

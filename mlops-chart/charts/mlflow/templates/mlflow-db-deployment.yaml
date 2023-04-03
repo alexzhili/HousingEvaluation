@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    mlops.service: mlflow-db
+  name: mlflow-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      mlops.service: mlflow-db
+  template:
+    metadata:
+      labels:
+        mlops.service: mlflow-db
+    spec:
+      volumes:
+        - name: mlflow-db-pv-storage
+          persistentVolumeClaim:
+            claimName: mlflow-db-pvc
+      containers:
+      - name: mlflow-db
+        image: mysql/mysql-server
+        resources: {}
+          # limits:
+          #   memory: "512Mi"
+          #   cpu: "2000m"
+        env:
+          - name: MYSQL_DATABASE
+            valueFrom:
+              configMapKeyRef:
+                name: mlops-conf
+                key: MYSQL_DATABASE
+          - name: MYSQL_USER
+            valueFrom:
+              configMapKeyRef:
+                name: mlops-conf
+                key: MYSQL_USER
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              configMapKeyRef:
+                name: mlops-conf
+                key: MYSQL_PASSWORD
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              configMapKeyRef:
+                name: mlops-conf
+                key: MYSQL_ROOT_PASSWORD
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: mlflow-db-pv-storage
+      restartPolicy: Always

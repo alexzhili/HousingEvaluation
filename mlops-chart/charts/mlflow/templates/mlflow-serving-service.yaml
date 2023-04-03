@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    mlops.service: mlflow-serving
+  name: mlflow-serving
+spec:
+  selector:
+    mlops.service: mlflow-serving
+  ports:
+  - name: 'model-serving-port'
+    port: 5001
+    targetPort: 5001
+  type: LoadBalancer
+status:
+  loadBalancer: {}

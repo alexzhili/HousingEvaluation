@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    mlops.service: spark-master
+  name: spark-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      mlops.service: spark-master
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        mlops.service: spark-master
+    spec:
+      imagePullSecrets:
+      - name: regcred    
+      containers:
+        - name: spark-master
+          image: rg.nl-ams.scw.cloud/mlops-datapebbles/spark-master:3.3
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+            - containerPort: 7077
+          env:
+            - name: SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED
+              value: "no"
+            - name: SPARK_MODE
+              value: master
+            - name: SPARK_RPC_AUTHENTICATION_ENABLED
+              value: "no"
+            - name: SPARK_RPC_ENCRYPTION_ENABLED
+              value: "no"
+            - name: SPARK_SSL_ENABLED
+              value: "no"
+            - name: SPARK_MASTER_HOST
+              value: spark-master
+            - name: SPARK_MASTER_PORT
+              value: "7077"
+            # - name: DEPLOY_MODE
+            #   value: "cluster"
+          resources: {}
+            # requests:
+            #   cpu: 100m
+            # limits:
+            #   cpu: 100m
+            #   memory: 1024Mi
+          stdin: true
+          tty: true
+      hostname: spark-master
+      restartPolicy: Always
+status: {}

@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    mlops.service: notebooks
+  name: notebooks
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      mlops.service: notebooks
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        mlops.service: notebooks
+    spec:
+      volumes:
+        - name: notebooks-pv-storage
+          persistentVolumeClaim:
+            claimName: notebooks-pvc
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: notebooks
+        image: rg.nl-ams.scw.cloud/mlops-datapebbles/pyspark-runner:latest
+        imagePullPolicy: IfNotPresent
+        resources: {}
+          # limits:
+          #   memory: "1024Mi"
+          #   cpu: "1000m"
+        ports:
+        - containerPort: 8888
+        workingDir: /home/Notebooks
+        env:
+        - name: SPARK_MASTER
+          value: spark://spark-master:7077
+        - name: MLFLOW_TRACKING_URI
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: MLFLOW_TRACKING_URI
+        - name: MLFLOW_S3_ENDPOINT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: MLFLOW_S3_ENDPOINT_URL
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: AWS_SECRET_ACCESS_KEY
+        args: 
+        - jupyter
+        - notebook
+        - --ip=0.0.0.0
+        - --port=8888
+        - --no-browser
+        - --allow-root
+        volumeMounts:
+          - mountPath: /home/Notebooks
+            name: notebooks-pv-storage
+      restartPolicy: Always

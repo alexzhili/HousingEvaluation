@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    mlops.service: mlflow-tracking
+  name: mlflow-tracking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      mlops.service: mlflow-tracking
+  template:
+    metadata:
+      labels:
+        mlops.service: mlflow-tracking
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: mlflow-tracking
+        image: rg.nl-ams.scw.cloud/mlops-datapebbles/mlflow-tracking-server
+        resources: {}
+          # limits:
+          #   memory: "1024Mi"
+          #   cpu: "1000m"
+        ports:
+        - containerPort: 5000
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_BUCKET_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: AWS_BUCKET_NAME
+        - name: MLFLOW_S3_ENDPOINT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: MLFLOW_S3_ENDPOINT_URL
+        - name: MYSQL_USER
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: MYSQL_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: MYSQL_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: MYSQL_DATABASE
+        args: 
+          - mlflow
+          - server
+          - --backend-store-uri 
+          - mysql+pymysql://mlflow_user:mlflow_password@mlflow-db:3306/mlflow
+          - --default-artifact-root 
+          - s3://mlflow/
+          - -h
+          - 0.0.0.0
+
+

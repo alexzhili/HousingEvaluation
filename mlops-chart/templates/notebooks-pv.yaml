@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: notebooks-pv
+  labels:
+    mlops.service: notebooks-pv
+spec:
+  storageClassName: manual
+  claimRef:
+    namespace: default
+    name: notebooks-pvc
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /pv/notebooks/data

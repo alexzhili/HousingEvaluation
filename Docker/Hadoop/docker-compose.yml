@@ -1,0 +1,85 @@
+version: "3"
+
+services:
+  namenode:
+    build: 
+      context: ./namenode
+    image: hadoop-namenode
+    container_name: namenode
+    restart: always
+    ports:
+      - 9870:9870
+      - 9000:9000
+    volumes:
+      - ./:/project
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hadoop.env
+
+  datanode:
+    build: 
+      context: ./datanode
+    image: hadoop-datanode
+    #container_name: datanode
+    restart: always
+    # ports:
+    #   - 9864:9864  # WebUI - dfs.datanode.http.address
+    #   - 9866:9866  # Data transfer - dfs.datanode.address
+    # volumes:
+    #   - hadoop_datanode:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file:
+      - ./hadoop.env
+    deploy:
+      mode: replicated
+      replicas: 3
+
+
+  resourcemanager:
+    build: 
+      context: ./resourcemanager
+    image: hadoop-resourcemanager
+    container_name: resourcemanager
+    restart: always
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 datanode:9866"
+    env_file:
+      - ./hadoop.env
+
+  nodemanager:
+    build: 
+      context: ./nodemanager
+    image: hadoop-nodemanager
+    container_name: nodemanager
+    restart: always
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 datanode:9866 resourcemanager:8088"
+    env_file:
+      - ./hadoop.env
+  
+  historyserver:
+    build: 
+      context: ./historyserver
+    image: hadoop-historyserver
+    container_name: historyserver
+    restart: always
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 datanode:9866 resourcemanager:8088"
+    # volumes:
+    #   - hadoop_historyserver:/hadoop/yarn/timeline
+    env_file:
+      - ./hadoop.env
+
+# volumes:
+#   hadoop_namenode:
+#   hadoop_datanode:
+#   hadoop_historyserver:
+
+
+  hue:
+    image: gethue/hue
+    container_name: hue
+    ports:
+      - 8000:8888 

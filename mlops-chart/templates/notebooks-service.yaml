@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    mlops.service: notebooks
+  name: notebooks
+spec:
+  ports:
+    - name: "notebooks-ui"
+      port: 8888
+      targetPort: 8888
+  type: LoadBalancer
+  selector:
+    mlops.service: notebooks
+status:
+  loadBalancer: {}

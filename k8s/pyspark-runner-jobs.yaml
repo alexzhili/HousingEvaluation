@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pyspark-runner
+spec:
+  template:
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: pyspark-runner
+        image: rg.nl-ams.scw.cloud/mlops-datapebbles/pyspark-runner:latest
+        imagePullPolicy: IfNotPresent  # important needed when testing on local env
+        command: ["/bin/sh", "-c"]
+        args: 
+        - until (curl http://minio:9000 ) do echo '...waiting...' && sleep 1; done; 
+          until (curl http://mlflow-tracking:5000 ) do echo '...waiting...' && sleep 1; done;
+          python run.py;
+          exit 0;
+        resources: {}
+        workingDir: /home/Scripts
+        env:
+        - name: SPARK_MASTER
+          value: "spark://spark-master:7077"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: AWS_ACCESS_KEY_ID
+        - name: MLFLOW_TRACKING_URI
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: MLFLOW_TRACKING_URI
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_BUCKET_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: AWS_BUCKET_NAME
+        - name: MLFLOW_S3_ENDPOINT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mlops-conf
+              key: MLFLOW_S3_ENDPOINT_URL
+        - name: AWS_DEFAULT_REGION
+          value: ""
+      restartPolicy: OnFailure

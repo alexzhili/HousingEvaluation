@@ -1,0 +1,223 @@
+version: '3' 
+services:
+
+  spark-master:
+    build: 
+      context: .
+      dockerfile: ./Docker/Spark/master/Dockerfile
+    image: spark-master:3.3
+    container_name: spark-master
+    hostname: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - 8080:8080
+      - 7077:7077
+    stdin_open: true
+    tty: true
+    # networks:
+    #   - internal
+
+
+  spark-worker:
+    build: 
+      context: .
+      dockerfile: ./Docker/Spark/worker/Dockerfile
+    image: spark-worker:3.3
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_MODE=worker
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    stdin_open: true
+    tty: true
+    deploy:
+      mode: replicated
+      replicas: 2
+
+
+  # sparkling-master:
+  #   build: 
+  #     context: .
+  #     dockerfile: ./Docker/Spark/master/Dockerfile
+  #   image: spark-master:3.3
+  #   container_name: sparkling-master
+  #   hostname: sparkling-master
+  #   environment:
+  #     - SPARK_MODE=master
+  #     - SPARK_RPC_AUTHENTICATION_ENABLED=no
+  #     - SPARK_RPC_ENCRYPTION_ENABLED=no
+  #     - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+  #     - SPARK_SSL_ENABLED=no
+  #   # ports:
+  #   #   - 8080:8080
+  #   #   - 7077:7077
+  #   stdin_open: true
+  #   tty: true
+  #   # networks:
+  #   #   - internal
+
+
+  # sparkling-worker:
+  #   build: 
+  #     context: .
+  #     dockerfile: ./Docker/Spark/worker/Dockerfile
+  #   image: spark-worker:3.3
+  #   depends_on:
+  #     - sparkling-master
+  #   environment:
+  #     - SPARK_MASTER=spark://sparkling-master:7077
+  #     - SPARK_MODE=worker
+  #     - SPARK_WORKER_MEMORY=1G
+  #     - SPARK_WORKER_CORES=1
+  #     - SPARK_RPC_AUTHENTICATION_ENABLED=no
+  #     - SPARK_RPC_ENCRYPTION_ENABLED=no
+  #     - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+  #     - SPARK_SSL_ENABLED=no
+  #   stdin_open: true
+  #   tty: true
+  #   deploy:
+  #     mode: replicated
+  #     replicas: 1
+
+
+  # sparkling-water:
+  #   image: sparkling:3.3
+  #   container_name: sparkling-water
+  #   depends_on:
+  #     - sparkling-master
+  #   ports:
+  #     - 54321:54321
+  #   environment:
+  #     - MASTER=spark://sparkling-master:7077
+
+
+  Notebooks:
+    build: 
+      context: .
+      dockerfile: ./Docker/pySpark-runner/Dockerfile
+    image: pyspark-runner
+    container_name: Notebooks
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - MLFLOW_TRACKING_URI=http://mlflow-tracking:5000
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - MLFLOW_S3_ENDPOINT_URL=http://s3:9000
+    command: jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+    ports:
+      - 8888:8888
+    volumes: 
+      - ./Notebooks:/home
+
+
+  ML-trainer:
+    image: pyspark-runner
+    container_name: ML-trainer
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - MLFLOW_TRACKING_URI=http://mlflow-tracking:5000
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - MLFLOW_S3_ENDPOINT_URL=http://s3:9000
+    command: python run.py
+    volumes: 
+      - ./Scripts:/home
+    
+
+  mlflow-tracking:
+    container_name: mlflow-tracking-server
+    image: mlflow-tracking-server
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: ./Docker/MLflow/Dockerfile
+    ports:
+      - 5000:5000
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_REGION}
+      - MLFLOW_S3_ENDPOINT_URL=http://s3:9000
+    command: > 
+      mlflow server --backend-store-uri mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE} 
+                    --artifacts-destination s3://${AWS_BUCKET_NAME}/ 
+                    --default-artifact-root s3://${AWS_BUCKET_NAME}/
+                    -h 0.0.0.0
+  # --default-artifact-root s3://${AWS_BUCKET_NAME}/
+  # mlflow-serving:
+  #     container_name: mlflow-serving-server
+  #     image: pyspark-runner
+  #     restart: unless-stopped
+  #     ports:
+  #       - 5001:5000
+  #     environment:
+  #       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+  #       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+  #       - AWS_DEFAULT_REGION=${AWS_REGION}
+  #       - MLFLOW_S3_ENDPOINT_URL=http://s3:9000
+  #       - MLFLOW_TRACKING_URI=http://mlflow-tracking:5000
+  #     # networks:
+  #     #   - internal
+  #     entrypoint: mlflow models serve -m "models:/RF-Hyperopt/Production" --env-manager=local -h 0.0.0.0
+    
+  s3:
+    image:  minio/minio
+    restart: unless-stopped
+    ports:
+      - 9000:9000
+      - 9001:9001
+    environment:
+      - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
+      - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_volume:/data
+  
+
+  db:
+    image: mysql/mysql-server
+    restart: unless-stopped
+    container_name: mlflow_db
+    expose:
+      - 3306
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - db_volume:/var/lib/mysql
+
+
+  create_s3_buckets:
+    image: minio/mc
+    depends_on:
+      - s3
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set minio http://s3:9000 '${AWS_ACCESS_KEY_ID}' '${AWS_SECRET_ACCESS_KEY}') do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc mb minio/mlflow;
+      /usr/bin/mc mb minio/sf-listing;
+      exit 0;
+      "
+
+
+
+volumes:
+  db_volume:
+  minio_volume:

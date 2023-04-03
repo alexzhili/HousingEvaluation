@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    mlops.service: mlflow-serving
+  name: mlflow-serving
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      mlops.service: mlflow-serving
+  template:
+    metadata:
+      labels:
+        mlops.service: mlflow-serving
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: mlflow-serving-server
+        image: rg.nl-ams.scw.cloud/mlops-datapebbles/pyspark-runner:latest
+        resources: {}
+          # limits:
+          #   memory: "512Mi"
+          #   cpu: "500m"
+        ports:
+        - containerPort: 5001
+        env:
+          - name: MLFLOW_TRACKING_URI
+            valueFrom:
+              configMapKeyRef:
+                name: mlops-conf
+                key: MLFLOW_TRACKING_URI
+          - name: MLFLOW_S3_ENDPOINT_URL
+            valueFrom:
+              configMapKeyRef:
+                name: mlops-conf
+                key: MLFLOW_S3_ENDPOINT_URL
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              configMapKeyRef:
+                name: mlops-conf
+                key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              configMapKeyRef:
+                name: mlops-conf
+                key: AWS_SECRET_ACCESS_KEY
+        args:
+          - mlflow
+          - models
+          - serve
+          - -m 
+          - "models:/RF-Hyperopt/Production"
+          - --env-manager=local
+          - -h 
+          - 0.0.0.0
+          - -p 
+          - '5001'
+      restartPolicy: Always
